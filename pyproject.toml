@@ -1,0 +1,59 @@
+[project]
+name = "ttok4bedrock"
+version = "0.1.0"
+description = "Token counting for Amazon Bedrock models - ttok compatible"
+readme = "README.md"
+requires-python = ">=3.8.1"
+dependencies = [
+    "boto3>=1.26.0",
+    "click>=8.0.0",
+    "botocore>=1.29.0",
+]
+authors = [
+    {name = "Danilo Poccia"},
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.10.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+]
+
+[project.scripts]
+ttok4bedrock = "ttok4bedrock.cli:cli"
+
+[project.urls]
+Homepage = "https://github.com/danilop/ttok4bedrock"
+Repository = "https://github.com/danilop/ttok4bedrock"
+Issues = "https://github.com/danilop/ttok4bedrock/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "black>=24.8.0",
+    "flake8>=7.1.2",
+    "mypy>=1.14.1",
+    "pytest>=8.3.5",
+    "pytest-cov>=5.0.0",
+    "pytest-mock>=3.14.1",
+]
