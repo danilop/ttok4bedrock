@@ -26,39 +26,64 @@ Token counting for Amazon Bedrock models - drop-in replacement for **ttok** with
 
 **Prerequisites:** [Install uv](https://docs.astral.sh/uv/getting-started/installation/) if you haven't already.
 
+### Option 1: Install from GitHub repository
+```bash
+uv tool install git+https://github.com/danilop/ttok4bedrock.git
+```
+
+### Option 2: Install from local source
 ```bash
 # Clone the repository
 git clone https://github.com/danilop/ttok4bedrock.git
 cd ttok4bedrock
 
 # Install with uv
-uv sync
+uv tool install .
+```
+
+### Create a convenient alias
+After installation, you can create an alias to use `ttok` instead of `ttok4bedrock`:
+
+```bash
+# Add to your shell profile (~/.bashrc, ~/.zshrc, etc.)
+alias ttok='ttok4bedrock'
+
+# Or for a one-time use
+alias ttok='uv tool run ttok4bedrock'
 ```
 
 ## Quick Start
 
 ### CLI Usage (Identical to ttok)
 
+After installation with `uv tool install`, you can use `ttok4bedrock` directly or create an alias for `ttok`:
+
 ```bash
 # Count tokens (default: Claude Sonnet 4)
-uv run ttok4bedrock "Hello, world!"
+ttok4bedrock "Hello, world!"
+# Output: 11
+
+# With alias (if you created one)
+ttok "Hello, world!"
 # Output: 11
 
 # Count from stdin
-echo "Count these tokens" | uv run ttok4bedrock
-cat document.txt | uv run ttok4bedrock
+echo "Count these tokens" | ttok4bedrock
+cat document.txt | ttok4bedrock
 
 # Truncate to N tokens
-uv run ttok4bedrock -t 100 "Very long text..."
-cat large.txt | uv run ttok4bedrock -t 100 > truncated.txt
+ttok4bedrock -t 100 "Very long text..."
+cat large.txt | ttok4bedrock -t 100 > truncated.txt
 
 # Use specific Bedrock model (full model ID)
-uv run ttok4bedrock -m anthropic.claude-3-5-sonnet-20241022-v2:0 "Text"
-uv run ttok4bedrock -m anthropic.claude-3-7-sonnet-20250219-v1:0 "Text"
+ttok4bedrock -m anthropic.claude-3-5-sonnet-20241022-v2:0 "Text"
+ttok4bedrock -m anthropic.claude-3-7-sonnet-20250219-v1:0 "Text"
 
 # Specify AWS region (uses default if not specified)
-uv run ttok4bedrock --aws-region us-west-2 "Text"
+ttok4bedrock --aws-region us-west-2 "Text"
 ```
+
+**Note:** If you haven't installed with `uv tool install`, you can still use `uv run ttok4bedrock` as shown in the migration section below.
 
 ## Algorithm Description
 
@@ -209,13 +234,21 @@ ttok "Count my tokens"
 ttok -m gpt-4 "Text"
 cat large.txt | ttok -t 100
 
-# After (uv run ttok4bedrock)
+# After installation with uv tool install
+ttok4bedrock "Count my tokens"  # Same interface!
+ttok4bedrock -m anthropic.claude-3-5-sonnet-20241022-v2:0 "Text"
+cat large.txt | ttok4bedrock -t 100  # Identical usage
+
+# With alias (recommended)
+alias ttok='ttok4bedrock'
+ttok "Count my tokens"  # Drop-in replacement!
+ttok -m anthropic.claude-3-5-sonnet-20241022-v2:0 "Text"
+cat large.txt | ttok -t 100
+
+# Alternative: without installation (uv run)
 uv run ttok4bedrock "Count my tokens"  # Same interface!
 uv run ttok4bedrock -m anthropic.claude-3-5-sonnet-20241022-v2:0 "Text"
 cat large.txt | uv run ttok4bedrock -t 100  # Identical usage
-
-# Can be used as drop-in replacement
-uv run ttok4bedrock "Now using Bedrock!"  # Same interface as ttok
 ```
 
 ### Python Migration
@@ -236,17 +269,19 @@ The tool provides clear error messages for AWS issues:
 
 ```bash
 # Model not found
-uv run ttok4bedrock -m anthropic.claude-invalid-model "text"
+ttok4bedrock -m anthropic.claude-invalid-model "text"
 # Error: AWS Bedrock API error (ValidationException): Model not found
 
 # No credentials
-uv run ttok4bedrock "text"
+ttok4bedrock "text"
 # Error: Unable to locate AWS credentials. Please configure AWS credentials...
 
 # No region
-uv run ttok4bedrock "text"
+ttok4bedrock "text"
 # Error: No AWS region configured. Use --aws-region option or configure a default region.
 ```
+
+**Note:** If using `uv run ttok4bedrock`, replace `ttok4bedrock` with `uv run ttok4bedrock` in the examples above.
 
 ## Development
 
