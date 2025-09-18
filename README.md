@@ -10,6 +10,10 @@ Token counting for Amazon Bedrock models - drop-in replacement for **ttok** with
 - 📊 **Accurate counts** - Uses the Bedrock CountTokens API
 - ⚡ **Simple and fast** - No caching, no complexity
 
+For more information on this project, see this blog post:
+
+[Token Counting Meets Amazon Bedrock](https://dev.to/aws/token-counting-meets-amazon-bedrock-4dk5)
+
 ## Supported Models
 
 **Anthropic Claude models with CountTokens API support.** See the [AWS documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/count-tokens.html) for details.
