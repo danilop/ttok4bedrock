@@ -1,0 +1,197 @@
+{
+  "1": {
+    "text": "The module docstring doubles as the package description. When users run <code>help(ttok4bedrock)</code>, this is the first thing they see \u2014 it immediately communicates the library's purpose and compatibility promise.",
+    "diagram": "architecture",
+    "highlight": [
+      "sdk"
+    ],
+    "hash": "b6d267ef"
+  },
+  "6": {
+    "text": "These imports are at the top level even though they're only used indirectly. This is intentional \u2014 it ensures that import errors (missing boto3, wrong botocore version) surface immediately at <code>import ttok4bedrock</code> time, not deep inside a function call where the stack trace would be confusing.",
+    "hash": "14e52a3c"
+  },
+  "7": {
+    "text": "boto3 is imported at module level to fail fast \u2014 if the AWS SDK isn't installed, the error appears at import time with a clear <code>ModuleNotFoundError</code>, not buried in a function call.",
+    "diagram": "architecture",
+    "highlight": [
+      "sdk",
+      "boto"
+    ],
+    "hash": "8c345562"
+  },
+  "8": {
+    "text": "<code>ClientError</code> is imported but not used directly in this module. It's here so that users who do <code>from ttok4bedrock import *</code> don't get surprised by unhandled AWS exceptions \u2014 they can catch <code>ClientError</code> if needed.",
+    "diagram": "architecture",
+    "highlight": [
+      "sdk"
+    ],
+    "hash": "381ca9e4"
+  },
+  "9": {
+    "text": "The <code>json</code> module is imported for completeness \u2014 it's used by the core engine for message formatting, and having it available at the package level is a convenience.",
+    "diagram": "architecture",
+    "highlight": [
+      "sdk"
+    ],
+    "hash": "ff3e4d4d"
+  },
+  "11": {
+    "text": "Versioning follows semantic versioning. Having <code>__version__</code> as a module attribute lets tools like <code>pip show</code> and programmatic checks access the version without parsing <code>pyproject.toml</code>.",
+    "hash": "3ebbb406"
+  },
+  "12": {
+    "text": "<code>__all__</code> explicitly limits the public API to just two functions. This is the facade pattern \u2014 users get a simple interface while the complex <code>BedrockTokenCounter</code> class stays internal. Anyone doing <code>from ttok4bedrock import *</code> gets exactly what they need.",
+    "important": true,
+    "diagram": "architecture",
+    "highlight": [
+      "sdk"
+    ],
+    "hash": "21284d5c"
+  },
+  "15": {
+    "text": "The function signature mirrors ttok's API. The default model is set here at the API boundary, not inside BedrockTokenCounter \u2014 this keeps the core engine model-agnostic while giving SDK users a sensible default.",
+    "diagram": "architecture",
+    "highlight": [
+      "sdk",
+      "counter"
+    ],
+    "hash": "79c0df95"
+  },
+  "16": {
+    "text": "The <code>text</code> parameter is a plain string \u2014 no special formatting needed. The core engine handles wrapping it in the Bedrock message format internally.",
+    "diagram": "architecture",
+    "highlight": [
+      "sdk"
+    ],
+    "hash": "121a253b"
+  },
+  "17": {
+    "text": "The default model is the latest Claude Sonnet. Users can count tokens without knowing any Bedrock model IDs \u2014 the library picks a reasonable default.",
+    "diagram": "architecture",
+    "highlight": [
+      "sdk"
+    ],
+    "hash": "bfb41778"
+  },
+  "18": {
+    "text": "<code>Optional[str]</code> means the region can be <code>None</code>, in which case boto3 uses its default credential chain to determine the region. This keeps the API simple for users who have <code>AWS_DEFAULT_REGION</code> set.",
+    "diagram": "architecture",
+    "highlight": [
+      "sdk"
+    ],
+    "hash": "804dbd24"
+  },
+  "19": {
+    "text": "The return type <code>int</code> is explicit. Token counts are always whole numbers \u2014 there's no concept of a fractional token.",
+    "diagram": "architecture",
+    "highlight": [
+      "sdk"
+    ],
+    "hash": "a07746ce"
+  },
+  "45": {
+    "text": "Lazy import \u2014 <code>BedrockTokenCounter</code> is imported inside the function body, not at module level. This means the heavy class (with its boto3 dependency chain) only loads when someone actually calls <code>count_tokens()</code>, keeping <code>import ttok4bedrock</code> fast.",
+    "important": true,
+    "diagram": "architecture",
+    "highlight": [
+      "sdk",
+      "counter"
+    ],
+    "hash": "0a82d8e7"
+  },
+  "46": {
+    "text": "A new counter is created on every call. This is a deliberate simplicity-over-performance trade-off \u2014 the SDK functions are stateless, which makes them safe to call from anywhere without worrying about shared state. The downside is that the LRU cache is lost between calls.",
+    "diagram": "architecture",
+    "highlight": [
+      "sdk",
+      "counter"
+    ],
+    "hash": "658d843c"
+  },
+  "47": {
+    "text": "The SDK delegates immediately to the core engine. This one-liner is the entire implementation \u2014 the function exists purely to provide a convenient import path and default arguments.",
+    "diagram": "architecture",
+    "highlight": [
+      "sdk",
+      "counter"
+    ],
+    "hash": "5a4e134d"
+  },
+  "56": {
+    "text": "The <code>truncate()</code> function mirrors the original ttok API. Having both <code>count_tokens</code> and <code>truncate</code> as top-level functions means migration from ttok is a one-line import change.",
+    "diagram": "architecture",
+    "highlight": [
+      "sdk"
+    ],
+    "hash": "b6d267ef"
+  },
+  "57": {
+    "text": "The <code>text</code> parameter is the input to truncate. The function returns the longest prefix that fits within <code>max_tokens</code>.",
+    "diagram": "architecture",
+    "highlight": [
+      "sdk"
+    ],
+    "hash": "6eeb6261"
+  },
+  "58": {
+    "text": "<code>max_tokens</code> is the budget. The adaptive truncation algorithm in the core engine finds the exact character boundary where the token count crosses this limit.",
+    "diagram": "architecture",
+    "highlight": [
+      "sdk",
+      "counter"
+    ],
+    "hash": "e3b0c442"
+  },
+  "59": {
+    "text": "Same default model as <code>count_tokens()</code>. Consistency between the two functions means users can switch between counting and truncating without changing any parameters.",
+    "diagram": "architecture",
+    "highlight": [
+      "sdk"
+    ],
+    "hash": "dfbdcb8c"
+  },
+  "60": {
+    "text": "Same optional region parameter. The SDK functions are designed to be interchangeable \u2014 same signature pattern, same defaults, same behavior.",
+    "diagram": "architecture",
+    "highlight": [
+      "sdk"
+    ],
+    "hash": "45c22d29"
+  },
+  "61": {
+    "text": "Returns a <code>str</code> \u2014 the truncated text. Unlike the core engine's <code>truncate()</code> which can optionally return metadata, the SDK always returns just the text for simplicity.",
+    "diagram": "architecture",
+    "highlight": [
+      "sdk"
+    ],
+    "hash": "498e8723"
+  },
+  "82": {
+    "text": "Same lazy-import-and-delegate pattern as <code>count_tokens()</code>. The symmetry is intentional \u2014 both SDK functions have identical structure, making the codebase predictable.",
+    "diagram": "architecture",
+    "highlight": [
+      "sdk",
+      "counter"
+    ],
+    "hash": "0a82d8e7"
+  },
+  "83": {
+    "text": "Same pattern as <code>count_tokens()</code> \u2014 new counter per call. For users who need cache persistence across multiple operations, the <code>BedrockTokenCounter</code> class is available directly.",
+    "diagram": "architecture",
+    "highlight": [
+      "sdk",
+      "counter"
+    ],
+    "hash": "658d843c"
+  },
+  "84": {
+    "text": "Truncation delegates to the core engine's <code>truncate()</code> method, which implements the adaptive algorithm. The SDK doesn't expose <code>return_metadata</code> \u2014 that's an advanced feature only available through direct <code>BedrockTokenCounter</code> usage.",
+    "diagram": "architecture",
+    "highlight": [
+      "sdk",
+      "counter"
+    ],
+    "hash": "fa23c442"
+  }
+}

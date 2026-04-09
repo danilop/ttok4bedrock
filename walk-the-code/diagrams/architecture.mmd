@@ -1,0 +1,18 @@
+graph LR
+  user([User])
+  sdk["SDK API<br/>__init__.py"]
+  cli["CLI<br/>cli.py"]
+  counter["BedrockTokenCounter<br/>bedrock_counter.py"]
+  cache[("LRU Cache")]
+  boto["boto3 Client"]
+  api["Bedrock<br/>CountTokens API"]
+
+  user --> sdk
+  user --> cli
+  sdk --> counter
+  cli --> counter
+  counter --> cache
+  cache -->|miss| boto
+  boto --> api
+  api --> boto
+  cache -->|hit| counter

@@ -14,19 +14,25 @@ __all__ = ["count_tokens", "truncate"]
 
 def count_tokens(
     text: str,
-    model: str = "anthropic.claude-sonnet-4-20250514-v1:0",
+    model: str = "anthropic.claude-sonnet-4-6",
     aws_region: Optional[str] = None
 ) -> int:
     """
     Count tokens for given text using Anthropic Claude models on Bedrock.
     
     Supports Anthropic Claude models with CountTokens API:
-    - anthropic.claude-sonnet-4-20250514-v1:0 (default)
-    - anthropic.claude-3-5-haiku-20241022-v1:0
+    - anthropic.claude-sonnet-4-6 (default)
+    - anthropic.claude-opus-4-6-v1
+    - anthropic.claude-sonnet-4-5-20250929-v1:0
+    - anthropic.claude-opus-4-5-20251101-v1:0
+    - anthropic.claude-haiku-4-5-20251001-v1:0
+    - anthropic.claude-opus-4-1-20250805-v1:0
+    - anthropic.claude-sonnet-4-20250514-v1:0
+    - anthropic.claude-opus-4-20250514-v1:0
+    - anthropic.claude-3-7-sonnet-20250219-v1:0
     - anthropic.claude-3-5-sonnet-20241022-v2:0
     - anthropic.claude-3-5-sonnet-20240620-v1:0
-    - anthropic.claude-3-7-sonnet-20250219-v1:0
-    - anthropic.claude-opus-4-20250514-v1:0
+    - anthropic.claude-3-5-haiku-20241022-v1:0
     
     Args:
         text: Input text to count tokens for
@@ -44,19 +50,25 @@ def count_tokens(
 def truncate(
     text: str,
     max_tokens: int,
-    model: str = "anthropic.claude-sonnet-4-20250514-v1:0",
+    model: str = "anthropic.claude-sonnet-4-6",
     aws_region: Optional[str] = None
 ) -> str:
     """
     Truncate text to specified token count using Anthropic Claude models.
     
     Supports Anthropic Claude models with CountTokens API:
-    - anthropic.claude-sonnet-4-20250514-v1:0 (default)
-    - anthropic.claude-3-5-haiku-20241022-v1:0
+    - anthropic.claude-sonnet-4-6 (default)
+    - anthropic.claude-opus-4-6-v1
+    - anthropic.claude-sonnet-4-5-20250929-v1:0
+    - anthropic.claude-opus-4-5-20251101-v1:0
+    - anthropic.claude-haiku-4-5-20251001-v1:0
+    - anthropic.claude-opus-4-1-20250805-v1:0
+    - anthropic.claude-sonnet-4-20250514-v1:0
+    - anthropic.claude-opus-4-20250514-v1:0
+    - anthropic.claude-3-7-sonnet-20250219-v1:0
     - anthropic.claude-3-5-sonnet-20241022-v2:0
     - anthropic.claude-3-5-sonnet-20240620-v1:0
-    - anthropic.claude-3-7-sonnet-20250219-v1:0
-    - anthropic.claude-opus-4-20250514-v1:0
+    - anthropic.claude-3-5-haiku-20241022-v1:0
     
     Args:
         text: Input text to truncate

@@ -19,12 +19,18 @@ For more information on this project, see this blog post:
 **Anthropic Claude models with CountTokens API support.** See the [AWS documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/count-tokens.html) for details.
 
 ### Claude Models:
-- `anthropic.claude-sonnet-4-20250514-v1:0` (default)
-- `anthropic.claude-3-5-haiku-20241022-v1:0`
+- `anthropic.claude-sonnet-4-6` (default)
+- `anthropic.claude-opus-4-6-v1`
+- `anthropic.claude-sonnet-4-5-20250929-v1:0`
+- `anthropic.claude-opus-4-5-20251101-v1:0`
+- `anthropic.claude-haiku-4-5-20251001-v1:0`
+- `anthropic.claude-opus-4-1-20250805-v1:0`
+- `anthropic.claude-sonnet-4-20250514-v1:0`
+- `anthropic.claude-opus-4-20250514-v1:0`
+- `anthropic.claude-3-7-sonnet-20250219-v1:0`
 - `anthropic.claude-3-5-sonnet-20241022-v2:0`
 - `anthropic.claude-3-5-sonnet-20240620-v1:0`
-- `anthropic.claude-3-7-sonnet-20250219-v1:0`
-- `anthropic.claude-opus-4-20250514-v1:0`
+- `anthropic.claude-3-5-haiku-20241022-v1:0`
 
 ## Installation
 
@@ -63,7 +69,7 @@ alias ttok='uv tool run ttok4bedrock'
 After installation with `uv tool install`, you can use `ttok4bedrock` directly or create an alias for `ttok`:
 
 ```bash
-# Count tokens (default: Claude Sonnet 4)
+# Count tokens (default: Claude Sonnet 4.6)
 ttok4bedrock "Hello, world!"
 # Output: 11
 

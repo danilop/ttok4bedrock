@@ -16,7 +16,7 @@ from botocore.exceptions import ClientError, NoCredentialsError, NoRegionError
               help="Read input from file")
 @click.option("-t", "--truncate", type=int,
               help="Truncate to this many tokens")
-@click.option("-m", "--model", "model_id", default="anthropic.claude-sonnet-4-20250514-v1:0",
+@click.option("-m", "--model", "model_id", default="anthropic.claude-sonnet-4-6",
               help="Bedrock model ID")
 @click.option("--aws-region", help="AWS region for Bedrock")
 def cli(prompt, input_file, truncate, model_id, aws_region):
@@ -28,12 +28,18 @@ def cli(prompt, input_file, truncate, model_id, aws_region):
     Supports Anthropic Claude models with CountTokens API:
     
     \b
-    anthropic.claude-sonnet-4-20250514-v1:0 (default)
-    anthropic.claude-3-5-haiku-20241022-v1:0
+    anthropic.claude-sonnet-4-6 (default)
+    anthropic.claude-opus-4-6-v1
+    anthropic.claude-sonnet-4-5-20250929-v1:0
+    anthropic.claude-opus-4-5-20251101-v1:0
+    anthropic.claude-haiku-4-5-20251001-v1:0
+    anthropic.claude-opus-4-1-20250805-v1:0
+    anthropic.claude-sonnet-4-20250514-v1:0
+    anthropic.claude-opus-4-20250514-v1:0
+    anthropic.claude-3-7-sonnet-20250219-v1:0
     anthropic.claude-3-5-sonnet-20241022-v2:0
     anthropic.claude-3-5-sonnet-20240620-v1:0
-    anthropic.claude-3-7-sonnet-20250219-v1:0
-    anthropic.claude-opus-4-20250514-v1:0
+    anthropic.claude-3-5-haiku-20241022-v1:0
     
     To count tokens for text passed as arguments:
     

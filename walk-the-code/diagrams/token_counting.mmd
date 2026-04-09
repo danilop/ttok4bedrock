@@ -1,0 +1,18 @@
+graph TD
+  input["Input Text"]
+  format["Format as<br/>Bedrock Message"]
+  api_call["CountTokens API"]
+  raw["Raw Token Count<br/>(includes overhead)"]
+  overhead["Calculate Overhead<br/>(count 'A' → subtract 1)"]
+  subtract["Subtract Overhead"]
+  result["Final Token Count<br/>(text content only)"]
+  cache[("LRU Cache")]
+
+  input --> cache
+  cache -->|hit| raw
+  cache -->|miss| format
+  format --> api_call
+  api_call --> raw
+  raw --> subtract
+  overhead --> subtract
+  subtract --> result

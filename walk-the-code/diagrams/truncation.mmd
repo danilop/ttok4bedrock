@@ -1,0 +1,30 @@
+graph TD
+  start["Full Text Count"]
+  check{"Needs<br/>truncation?"}
+  no_trunc["Return Original Text"]
+  estimate["Smart Initial Estimate<br/>(text analysis + ratio)"]
+  loop_start["Test Substring"]
+  count_api["Count Tokens"]
+  exact{"Exact<br/>match?"}
+  done["Return Truncated Text"]
+  under{"Under<br/>target?"}
+  add_chars["Add Characters<br/>(ratio-based)"]
+  remove_chars["Remove Characters<br/>(ratio-based)"]
+  close{"Close to<br/>boundary?"}
+  fine_tune["Character-by-Character<br/>Fine-Tuning"]
+
+  start --> check
+  check -->|no| no_trunc
+  check -->|yes| estimate
+  estimate --> loop_start
+  loop_start --> count_api
+  count_api --> exact
+  exact -->|yes| done
+  exact -->|no| under
+  under -->|yes| close
+  under -->|no| remove_chars
+  close -->|yes| fine_tune
+  close -->|no| add_chars
+  add_chars --> loop_start
+  remove_chars --> loop_start
+  fine_tune --> done
