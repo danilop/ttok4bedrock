@@ -1,0 +1,51 @@
+name: Deploy walkthrough to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install walk-the-code
+        run: pip install walk-the-code
+
+      - name: Create symlinks for builder
+        run: cd ttok4bedrock && ln -s . sdk_api && ln -s . cli_entry && ln -s . core_engine
+
+      - name: Build walkthrough data
+        run: cd walk-the-code && wtc-build config.json
+
+      - name: Assemble static site
+        run: |
+          mkdir _site
+          ASSETS=$(python -c "import walk_the_code; print(walk_the_code.ASSETS_DIR)")
+          cp "$ASSETS"/*.html "$ASSETS"/*.js "$ASSETS"/*.css "$ASSETS"/*.svg _site/
+          cp -r walk-the-code/data _site/data
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - uses: actions/deploy-pages@v4
+        id: deployment

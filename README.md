@@ -14,6 +14,8 @@ For more information on this project, see this blog post:
 
 [Token Counting Meets Amazon Bedrock](https://dev.to/aws/token-counting-meets-amazon-bedrock-4dk5)
 
+📖 **[Interactive Code Walkthrough](https://danilop.github.io/ttok4bedrock/)** — explore the codebase with annotated explanations
+
 ## Supported Models
 
 **Anthropic Claude models with CountTokens API support.** See the [AWS documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/count-tokens.html) for details.
