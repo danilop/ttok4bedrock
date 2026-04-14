@@ -2,7 +2,7 @@
   "title": "ttok4bedrock",
   "tagline": "Token counting for Amazon Bedrock — a ttok-compatible CLI and SDK",
   "repo_url": "https://github.com/danilop/ttok4bedrock",
-  "code_dir": "../ttok4bedrock",
+  "code_dir": "..",
   "terminology": {
     "group": "Part",
     "unit": "Step"
@@ -10,6 +10,7 @@
   "units": [
     {
       "id": "sdk_api",
+      "path": "ttok4bedrock/__init__.py",
       "file": "__init__.py",
       "title": "SDK Public Interface",
       "tagline": "The two functions users import — count_tokens and truncate",
@@ -28,6 +29,7 @@
     },
     {
       "id": "cli_entry",
+      "path": "ttok4bedrock/cli.py",
       "file": "cli.py",
       "title": "CLI Entry Point",
       "tagline": "Click-based command-line interface with ttok-compatible flags",
@@ -46,6 +48,7 @@
     },
     {
       "id": "core_engine",
+      "path": "ttok4bedrock/bedrock_counter.py",
       "file": "bedrock_counter.py",
       "title": "Core Token Counting Engine",
       "tagline": "BedrockTokenCounter — API calls, LRU caching, and adaptive truncation",
