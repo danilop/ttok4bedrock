@@ -26,7 +26,8 @@ jobs:
 
       - name: Build walkthrough
         run: |
-          uvx --from "walk-the-code @ git+https://github.com/danilop/walk-the-code" wtc-build walk-the-code/config.json
+          uv tool install "walk-the-code @ git+https://github.com/danilop/walk-the-code"
+          wtc-build walk-the-code/config.json
           WTC_PYTHON="$(uv tool dir)/walk-the-code/bin/python"
           WTC_ASSETS=$("$WTC_PYTHON" -c "from walk_the_code import ASSETS_DIR; print(ASSETS_DIR)")
           mkdir -p _site/data
