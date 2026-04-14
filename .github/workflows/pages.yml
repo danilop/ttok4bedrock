@@ -27,6 +27,7 @@ jobs:
       - name: Build walkthrough
         run: |
           uv tool install "walk-the-code @ git+https://github.com/danilop/walk-the-code"
+          cd ttok4bedrock && ln -sf . sdk_api && ln -sf . cli_entry && ln -sf . core_engine && cd ..
           wtc-build walk-the-code/config.json
           WTC_PYTHON="$(uv tool dir)/walk-the-code/bin/python"
           WTC_ASSETS=$("$WTC_PYTHON" -c "from walk_the_code import ASSETS_DIR; print(ASSETS_DIR)")
