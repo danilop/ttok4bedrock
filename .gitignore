@@ -227,6 +227,3 @@ __marimo__/
 
 # walk-the-code build artifacts
 walk-the-code/data/
-ttok4bedrock/sdk_api
-ttok4bedrock/cli_entry
-ttok4bedrock/core_engine
