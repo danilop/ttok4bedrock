@@ -1,22 +1,6 @@
 {
-  "5": {
-    "text": "Click is imported instead of argparse because it provides a decorator-based API that's more readable for CLIs with many options. Each <code>@click.option</code> below maps directly to a CLI flag \u2014 the function signature <em>is</em> the interface definition.",
-    "diagram": "architecture",
-    "highlight": [
-      "cli"
-    ],
-    "hash": "76f34aea"
-  },
-  "6": {
-    "text": "<code>sys</code> is used for <code>sys.stdin</code> (reading piped input) and <code>sys.exit()</code> (returning proper exit codes). Exit code 1 signals failure to shell scripts that chain commands.",
-    "diagram": "architecture",
-    "highlight": [
-      "cli"
-    ],
-    "hash": "9e77b374"
-  },
   "8": {
-    "text": "The core engine is imported at module level (unlike the SDK's lazy import) because the CLI module is only loaded when the user runs the command \u2014 there's no startup penalty to worry about.",
+    "text": "The CLI imports <code>BedrockTokenCounter</code> directly at module level (unlike the SDK's deferred import). This is fine because the CLI module is only loaded when the user runs the command \u2014 there's no circular import risk here.",
     "diagram": "architecture",
     "highlight": [
       "cli",
@@ -25,68 +9,51 @@
     "hash": "0a82d8e7"
   },
   "9": {
-    "text": "Three specific exception types are imported for the error handling strategy below. Each AWS failure mode gets a distinct, user-friendly error message instead of a raw stack trace.",
+    "text": "Three specific botocore exceptions are imported for granular error handling. Each maps to a different user-facing message: missing credentials, missing region, or API-level failures. This is the boundary where AWS internals get translated into actionable CLI output.",
+    "diagram": "architecture",
+    "highlight": [
+      "cli",
+      "bedrock"
+    ],
     "hash": "f55614de"
   },
   "12": {
-    "text": "The <code>@click.command</code> decorator transforms this function into a CLI entry point. <code>context_settings</code> enables both <code>-h</code> and <code>--help</code> \u2014 a small UX detail that matches ttok's behavior.",
-    "important": true,
+    "text": "The <code>context_settings</code> enables both <code>-h</code> and <code>--help</code>. Click only supports <code>--help</code> by default \u2014 adding <code>-h</code> matches the convention users expect from Unix tools and the original <code>ttok</code>.",
     "diagram": "architecture",
     "highlight": [
       "cli"
     ],
     "hash": "b7760341"
   },
-  "13": {
-    "text": "<code>@click.version_option()</code> adds <code>--version</code> automatically. Click reads the version from the package metadata (set in <code>pyproject.toml</code>), so there's no hardcoded version string to keep in sync.",
-    "diagram": "architecture",
-    "highlight": [
-      "cli"
-    ],
-    "hash": "92cea802"
-  },
   "14": {
-    "text": "<code>nargs=-1</code> means \"accept any number of positional arguments.\" This is what lets users write <code>ttok4bedrock hello world</code> \u2014 the words are collected into a tuple and joined with spaces later.",
+    "text": "<code>nargs=-1</code> accepts any number of positional arguments and joins them as the input text. This matches <code>ttok</code>'s behavior: <code>ttok4bedrock one two three</code> counts tokens for <code>\"one two three\"</code>.",
     "diagram": "architecture",
     "highlight": [
       "cli"
     ],
     "hash": "95256418"
   },
-  "15": {
-    "text": "The <code>-i</code> flag accepts a file path and Click automatically opens it for reading. This handles file-not-found errors with a clean message before the function body even runs.",
-    "diagram": "architecture",
-    "highlight": [
-      "cli"
-    ],
-    "hash": "7f2cb715"
-  },
   "17": {
-    "text": "The <code>-t</code> flag switches the tool from counting mode to truncation mode. This mirrors ttok's interface exactly \u2014 same flag letter, same semantics.",
+    "text": "The <code>-t</code> flag for truncation is the key feature beyond simple counting. It triggers the adaptive truncation algorithm in <code>BedrockTokenCounter.truncate()</code>, which minimizes API calls while finding the exact token boundary.",
     "diagram": "architecture",
     "highlight": [
-      "cli"
+      "cli",
+      "counter"
     ],
     "hash": "eeffecd8"
   },
   "19": {
-    "text": "The default model ID is repeated here (same as in <code>__init__.py</code>). This duplication is intentional \u2014 the CLI and SDK are independent entry points that shouldn't depend on each other's defaults.",
+    "text": "The <code>-m</code> flag uses the same default model as the SDK. Keeping defaults consistent across CLI and SDK prevents subtle behavior differences that would confuse users switching between the two interfaces.",
     "diagram": "architecture",
     "highlight": [
-      "cli"
+      "cli",
+      "bedrock"
     ],
     "hash": "163c58d8"
   },
-  "21": {
-    "text": "The <code>--aws-region</code> option is Bedrock-specific \u2014 ttok doesn't have it. This is the only CLI flag that breaks strict ttok compatibility, but it's necessary for multi-region AWS setups.",
-    "diagram": "architecture",
-    "highlight": [
-      "cli"
-    ],
-    "hash": "3eb0f23f"
-  },
   "22": {
-    "text": "Click maps each decorator to a function parameter by name. The function signature becomes the CLI's contract \u2014 adding a new option is just another decorator + parameter.",
+    "text": "This is the main CLI function. Click's decorator stack above transforms it into a full command-line application with argument parsing, help text generation, and version display \u2014 all from a single function definition.",
+    "important": true,
     "diagram": "architecture",
     "highlight": [
       "cli"
@@ -94,7 +61,7 @@
     "hash": "214346e9"
   },
   "66": {
-    "text": "Input priority: if no positional args and no file, fall back to stdin. This three-source input strategy (<code>args > file > stdin</code>) is what makes the tool composable in shell pipelines \u2014 you can pipe, redirect, or pass inline text.",
+    "text": "Input assembly follows <code>ttok</code>'s precedence: if no arguments and no <code>-i</code> file, read from stdin. This enables pipe-friendly usage like <code>cat file.txt | ttok4bedrock</code>.",
     "important": true,
     "diagram": "architecture",
     "highlight": [
@@ -102,65 +69,16 @@
     ],
     "hash": "26f90253"
   },
-  "67": {
-    "text": "Assign stdin as the input source. Click's <code>sys.stdin</code> integration means the tool works naturally in pipelines: <code>cat file.txt | ttok4bedrock</code>.",
-    "diagram": "architecture",
-    "highlight": [
-      "cli"
-    ],
-    "hash": "15db8f13"
-  },
-  "69": {
-    "text": "Positional arguments are joined with spaces to reconstruct the original text. <code>ttok4bedrock hello world</code> becomes <code>\"hello world\"</code>.",
-    "hash": "56370b0e"
-  },
-  "71": {
-    "text": "When both a file and arguments are provided, the file content comes first. This matches ttok's behavior and lets users do things like <code>ttok4bedrock -i header.txt \"extra text\"</code>.",
-    "diagram": "architecture",
-    "highlight": [
-      "cli"
-    ],
-    "hash": "5a76df69"
-  },
-  "72": {
-    "text": "Read the entire file into memory. For token counting, we need the full text \u2014 streaming wouldn't help since the API requires the complete input.",
-    "diagram": "architecture",
-    "highlight": [
-      "cli"
-    ],
-    "hash": "84c54dd5"
-  },
   "73": {
-    "text": "If both file and arguments are provided, concatenate them with a space. This edge case is handled for ttok compatibility.",
+    "text": "When both file input and arguments are provided, file content comes first. This matches <code>ttok</code>'s concatenation behavior and lets users combine sources: <code>ttok4bedrock -i header.txt \"extra text\"</code>.",
     "diagram": "architecture",
     "highlight": [
       "cli"
     ],
     "hash": "29d89a09"
   },
-  "78": {
-    "text": "Empty input is caught early with a clear error. Without this guard, the Bedrock API would receive an empty message and return a confusing error about invalid input format.",
-    "hash": "6a8d90dc"
-  },
-  "79": {
-    "text": "Error output goes to stderr (<code>err=True</code>) so it doesn't corrupt stdout when the tool is used in a pipeline. <code>echo \"text\" | ttok4bedrock 2>/dev/null</code> would suppress errors while keeping the count.",
-    "diagram": "architecture",
-    "highlight": [
-      "cli"
-    ],
-    "hash": "75629f65"
-  },
-  "80": {
-    "text": "Exit code 1 signals failure. Shell scripts can check <code>$?</code> to detect errors: <code>ttok4bedrock \"text\" || echo \"failed\"</code>.",
-    "diagram": "architecture",
-    "highlight": [
-      "cli"
-    ],
-    "hash": "4cf92c48"
-  },
   "84": {
-    "text": "The counter is created once and reused for both the count and potential truncation. Unlike the SDK functions (which create a new counter per call), the CLI benefits from the LRU cache across operations within a single invocation.",
-    "important": true,
+    "text": "The counter is created inside the try block so that credential errors during client initialization are caught by the exception handlers below.",
     "diagram": "architecture",
     "highlight": [
       "cli",
@@ -169,111 +87,55 @@
     "hash": "658d843c"
   },
   "87": {
-    "text": "The mode branch: <code>-t</code> flag present \u2192 truncate and output text; absent \u2192 count and output number.",
+    "text": "The two code paths diverge here: truncation outputs text (no trailing newline, for pipe compatibility), while counting outputs a number (with newline). This matches <code>ttok</code>'s output contract exactly.",
     "diagram": "architecture",
     "highlight": [
-      "cli"
+      "cli",
+      "counter"
     ],
     "hash": "8c600e7b"
   },
-  "88": {
-    "text": "Truncation delegates to the core engine. The CLI passes the raw <code>-t</code> value as <code>max_tokens</code> \u2014 no validation needed since Click already ensures it's an integer.",
+  "90": {
+    "text": "<code>nl=False</code> suppresses the trailing newline so truncated output can be piped cleanly: <code>cat large.txt | ttok4bedrock -t 100 > truncated.txt</code>. Adding a newline would corrupt the output.",
     "diagram": "architecture",
     "highlight": [
-      "cli",
-      "counter"
+      "cli"
     ],
-    "hash": "de89f304"
-  },
-  "90": {
-    "text": "<code>nl=False</code> is critical for pipeline correctness. If truncated text is piped to a file, an extra newline would change the token count of the output. The count path (line 89) uses the default <code>nl=True</code> because a trailing newline after a number is expected.",
     "hash": "47f5b4c9"
   },
-  "93": {
-    "text": "Token counting is the default mode \u2014 no flags needed. The result is a single integer printed to stdout, ready for shell variable capture: <code>TOKENS=$(ttok4bedrock \"text\")</code>.",
+  "97": {
+    "text": "The error handling cascade is ordered from most specific to least specific. <code>NoCredentialsError</code> is the most common first-time setup issue, so it gets the most helpful message.",
     "diagram": "architecture",
     "highlight": [
       "cli",
-      "counter"
+      "bedrock"
     ],
-    "hash": "553f0ae0"
-  },
-  "95": {
-    "text": "The count is printed with a trailing newline (Click's default). This matches the convention for CLI tools that output a single value \u2014 <code>wc -l</code>, <code>du -s</code>, etc.",
-    "diagram": "architecture",
-    "highlight": [
-      "cli"
-    ],
-    "hash": "6655702b"
-  },
-  "97": {
-    "text": "The error handling cascade starts here. Each <code>except</code> block catches a specific AWS failure mode and translates it into a message that tells the user exactly what to do \u2014 not just what went wrong.",
-    "important": true,
     "hash": "4bc4e8a9"
   },
-  "98": {
-    "text": "The error message tells users exactly how to fix the problem: <code>aws configure</code> or environment variables. Generic \"authentication failed\" messages leave users guessing.",
-    "diagram": "architecture",
-    "highlight": [
-      "cli"
-    ],
-    "hash": "ac2bffdf"
-  },
-  "103": {
-    "text": "<code>sys.exit(1)</code> after each error ensures the process terminates with a non-zero exit code. This is critical for CI/CD pipelines and shell scripts that check exit status.",
-    "diagram": "architecture",
-    "highlight": [
-      "cli"
-    ],
-    "hash": "4cf92c48"
-  },
   "105": {
-    "text": "<code>NoRegionError</code> is separate from <code>NoCredentialsError</code> because the fix is different. Credentials need <code>aws configure</code>; region needs <code>--aws-region</code> or <code>AWS_DEFAULT_REGION</code>. Specific errors \u2192 specific guidance.",
+    "text": "<code>NoRegionError</code> is separate from credentials because the fix is different: users need <code>--aws-region</code> or <code>AWS_DEFAULT_REGION</code>, not <code>aws configure</code>. Specific error messages reduce support burden.",
     "diagram": "architecture",
     "highlight": [
-      "cli"
+      "cli",
+      "bedrock"
     ],
     "hash": "e2b13c8f"
   },
   "113": {
-    "text": "<code>ClientError</code> is the catch-all for Bedrock API errors (invalid model, throttling, access denied). The error code and message are extracted from the boto3 response structure to give users actionable information.",
+    "text": "<code>ClientError</code> catches all remaining Bedrock API failures (invalid model, throttling, access denied). The error code and message are extracted from the boto3 response structure and formatted for readability.",
     "diagram": "architecture",
     "highlight": [
       "cli",
-      "boto"
+      "bedrock"
     ],
     "hash": "e5a0bf92"
   },
-  "115": {
-    "text": "Extracting the error code and message from the nested response dict. The <code>.get()</code> chain with defaults ensures this never crashes even if the error response has an unexpected structure.",
-    "hash": "c745c66c"
-  },
-  "117": {
-    "text": "Format the error as a single line with the error code in parentheses. This makes it easy to grep for specific error types in logs: <code>ttok4bedrock \"text\" 2>&1 | grep ValidationException</code>.",
+  "125": {
+    "text": "The <code>__main__</code> guard allows running the module directly with <code>python -m ttok4bedrock.cli</code>, but the primary entry point is the <code>ttok4bedrock</code> console script defined in <code>pyproject.toml</code>.",
     "diagram": "architecture",
     "highlight": [
       "cli"
     ],
-    "hash": "2a852415"
-  },
-  "118": {
-    "text": "Exit with code 1 for API errors. All error paths use the same exit code \u2014 the error message on stderr distinguishes the failure type.",
-    "diagram": "architecture",
-    "highlight": [
-      "cli"
-    ],
-    "hash": "4cf92c48"
-  },
-  "120": {
-    "text": "The final catch-all ensures the CLI never shows a raw Python traceback to users. Any unexpected error gets a clean one-line message and exit code 1.",
-    "hash": "e05a0566"
-  },
-  "126": {
-    "text": "The <code>if __name__</code> guard allows running the CLI directly with <code>python -m ttok4bedrock.cli</code> during development, in addition to the <code>ttok4bedrock</code> entry point defined in <code>pyproject.toml</code>.",
-    "diagram": "architecture",
-    "highlight": [
-      "cli"
-    ],
-    "hash": "d7ed8014"
+    "hash": "3412809c"
   }
 }

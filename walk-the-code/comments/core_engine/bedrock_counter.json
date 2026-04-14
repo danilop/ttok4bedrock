@@ -1,40 +1,15 @@
 {
-  "5": {
-    "text": "boto3 is the AWS SDK for Python. It's the only external dependency beyond Click \u2014 the library delegates all AWS communication to boto3 rather than making raw HTTP calls.",
-    "diagram": "architecture",
-    "highlight": [
-      "boto"
-    ],
-    "hash": "8c345562"
-  },
-  "6": {
-    "text": "<code>ClientError</code> is boto3's base exception for AWS API errors. It's imported here for use in the truncation algorithm's error recovery \u2014 API failures during truncation are caught and retried with smaller inputs.",
-    "diagram": "architecture",
-    "highlight": [
-      "boto"
-    ],
-    "hash": "381ca9e4"
-  },
-  "7": {
-    "text": "The <code>json</code> module is used to serialize the Anthropic message format. The CountTokens API expects a JSON string in the <code>body</code> field, not a Python dict.",
-    "diagram": "token_counting",
-    "highlight": [
-      "format"
-    ],
-    "hash": "ff3e4d4d"
-  },
   "9": {
-    "text": "<code>lru_cache</code> from the standard library is the foundation of the caching strategy. It memoizes function results by arguments, so identical <code>(text, model_id)</code> pairs return instantly on subsequent calls. This is critical for the truncation algorithm, which may test overlapping substrings.",
+    "text": "<code>lru_cache</code> from the standard library provides memoization with automatic eviction. It's the key optimization: the Bedrock CountTokens API has latency (~200ms per call), so caching identical requests avoids redundant network round-trips.",
     "important": true,
-    "diagram": "token_counting",
+    "diagram": "architecture",
     "highlight": [
       "cache"
     ],
     "hash": "0905f232"
   },
   "12": {
-    "text": "The class encapsulates all Bedrock interaction. Everything outside this class (SDK, CLI) just creates an instance and calls <code>count_tokens()</code> or <code>truncate()</code>. This single-responsibility design means AWS-specific logic never leaks into the interface layer.",
-    "important": true,
+    "text": "The entire library revolves around this single class. It encapsulates the Bedrock client, the LRU cache, and both the counting and truncation algorithms. All external interfaces (SDK and CLI) delegate to this class.",
     "diagram": "architecture",
     "highlight": [
       "counter"
@@ -42,397 +17,154 @@
     "hash": "7fee9b0b"
   },
   "16": {
-    "text": "The supported models list serves as both documentation and a validation gate. <code>_format_input_for_model()</code> checks against this list and raises a clear error for unsupported models \u2014 failing fast with guidance instead of letting the API return a cryptic error.",
+    "text": "The supported models list is a class-level constant used for validation in <code>_format_input_for_model</code>. Only Anthropic Claude models support the Bedrock CountTokens API \u2014 other model families (Titan, Llama, Mistral) use different tokenization approaches.",
     "diagram": "architecture",
     "highlight": [
-      "counter"
+      "bedrock"
     ],
     "hash": "b46dda77"
   },
-  "17": {
-    "text": "The default model (Claude Sonnet 4.6) is listed first. The order matches the <code>--help</code> output in the CLI, making it easy for users to find the default.",
+  "31": {
+    "text": "The constructor takes an optional region and cache size. Region follows boto3's resolution chain (env var \u2192 config file \u2192 instance metadata), so most users never need to specify it explicitly.",
     "diagram": "architecture",
     "highlight": [
       "counter"
-    ],
-    "hash": "68a558d5"
-  },
-  "31": {
-    "text": "The constructor accepts optional region and cache size but doesn't create the boto3 client yet \u2014 that's deferred to the <code>client</code> property. This lazy initialization means you can create a <code>BedrockTokenCounter</code> without triggering AWS credential resolution.",
-    "diagram": "architecture",
-    "highlight": [
-      "counter",
-      "boto"
     ],
     "hash": "f10c6e14"
   },
-  "39": {
-    "text": "Store the region for later use when creating the boto3 client. If <code>None</code>, boto3 will use its default credential chain to determine the region.",
-    "diagram": "architecture",
-    "highlight": [
-      "counter"
-    ],
-    "hash": "10d535da"
-  },
   "40": {
-    "text": "The client is <code>None</code> initially. The <code>@property</code> below creates it on first access. This avoids the cost of credential resolution and HTTP connection setup until someone actually calls the API.",
+    "text": "<code>_client = None</code> enables lazy initialization \u2014 the boto3 client isn't created until the first API call. This means importing the library and creating a counter instance is fast and doesn't require AWS credentials.",
     "diagram": "architecture",
     "highlight": [
       "counter",
-      "boto"
+      "bedrock"
     ],
     "hash": "772aff46"
   },
-  "41": {
-    "text": "Store the cache size for potential future use (e.g., resizing the cache). The default of 1000 entries is generous \u2014 most use cases won't count 1000 unique strings.",
-    "diagram": "token_counting",
-    "highlight": [
-      "cache"
-    ],
-    "hash": "7e88219d"
-  },
   "43": {
-    "text": "The LRU cache is created as an instance attribute by wrapping <code>_count_tokens_impl</code> with <code>lru_cache</code>. This is a workaround for a Python limitation \u2014 you can't use <code>@lru_cache</code> directly on instance methods because <code>self</code> would be part of the cache key, making every instance have its own cache (which is actually what we want here, but the decorator syntax doesn't work with unhashable self).",
-    "important": true,
-    "diagram": "token_counting",
+    "text": "This is the critical caching setup. <code>lru_cache</code> is applied to the bound method <code>_count_tokens_impl</code> at instance creation time. This means each <code>BedrockTokenCounter</code> instance has its own independent cache \u2014 important because different instances may target different AWS regions.",
+    "diagram": "architecture",
     "highlight": [
-      "cache"
+      "cache",
+      "counter"
     ],
     "hash": "41167a93"
   },
-  "45": {
-    "text": "The <code>@property</code> decorator makes <code>self.client</code> look like an attribute but actually runs this method. First access creates the boto3 client; subsequent accesses return the cached instance.",
-    "diagram": "architecture",
-    "highlight": [
-      "boto"
-    ],
-    "hash": "ec9ed035"
-  },
   "48": {
-    "text": "Guard clause: only create the client once. After the first call, <code>self._client</code> is set and this branch is skipped.",
+    "text": "Lazy client initialization: the boto3 client is created on first access, not in <code>__init__</code>. This is a property (not a method) so callers use <code>self.client</code> naturally. The <code>if None</code> check ensures it's created exactly once.",
     "diagram": "architecture",
     "highlight": [
-      "boto"
+      "counter",
+      "bedrock"
     ],
     "hash": "6d678638"
   },
-  "49": {
-    "text": "The service name <code>bedrock-runtime</code> (not <code>bedrock</code>) is required for the CountTokens API. The base <code>bedrock</code> service is for model management; <code>bedrock-runtime</code> is for inference and token counting.",
-    "diagram": "architecture",
-    "highlight": [
-      "boto",
-      "api"
-    ],
-    "hash": "2ee4c12c"
-  },
-  "50": {
-    "text": "Only set the region if explicitly provided. This respects the boto3 credential chain \u2014 if no region is passed, boto3 checks <code>AWS_DEFAULT_REGION</code>, <code>~/.aws/config</code>, and instance metadata in order.",
-    "diagram": "architecture",
-    "highlight": [
-      "boto"
-    ],
-    "hash": "85cde953"
-  },
-  "52": {
-    "text": "The <code>**client_kwargs</code> pattern allows conditional parameters. Without a region, the dict has only <code>service_name</code>; with a region, it also has <code>region_name</code>. This is cleaner than an if/else with two separate <code>boto3.client()</code> calls.",
-    "diagram": "architecture",
-    "highlight": [
-      "boto"
-    ],
-    "hash": "bddf2cd4"
-  },
-  "53": {
-    "text": "Return the client instance. On subsequent calls, the guard clause at line 42 skips creation and returns the cached client directly.",
-    "diagram": "architecture",
-    "highlight": [
-      "boto"
-    ],
-    "hash": "f3786ac8"
-  },
   "55": {
-    "text": "Overhead calculation: count tokens for the string <code>\"A\"</code> (1 token of actual content), then subtract 1. The difference is the message structure overhead \u2014 typically ~7 tokens for the JSON wrapper that Bedrock requires. This result is cached by the LRU cache since <code>(\"A\", model_id)</code> is a stable key.",
-    "important": true,
-    "diagram": "token_counting",
+    "text": "The Bedrock CountTokens API wraps text in a message structure that adds ~7 tokens of overhead. This method measures that overhead by counting tokens for a single character <code>\"A\"</code> and subtracting 1. The result is cached via the same LRU cache, so overhead is computed once per model.",
+    "diagram": "architecture",
     "highlight": [
-      "overhead"
+      "counter",
+      "bedrock"
     ],
     "hash": "e0e8efc5"
   },
   "61": {
-    "text": "Using <code>\"A\"</code> as the probe text is deliberate \u2014 it's a single character that tokenizes to exactly 1 token across all supported models. Any single ASCII letter would work, but <code>\"A\"</code> is the conventional choice.",
-    "diagram": "token_counting",
+    "text": "Using <code>\"A\"</code> (a single ASCII character that tokenizes to exactly 1 token) as the probe text. The raw API returns <code>overhead + 1</code>, so subtracting 1 isolates the message structure cost. This is a clever calibration technique.",
+    "diagram": "architecture",
     "highlight": [
-      "overhead"
+      "cache",
+      "bedrock"
     ],
     "hash": "564ae7fe"
   },
-  "62": {
-    "text": "Call the cached counting implementation with the probe text. If this is the first call for this model, it hits the API; subsequent calls for the same model return instantly from cache.",
-    "diagram": "token_counting",
-    "highlight": [
-      "cache",
-      "overhead"
-    ],
-    "hash": "12fa72c3"
-  },
-  "64": {
-    "text": "The overhead is the raw count minus 1 (for the single-character probe). For Claude models, this is typically 7 tokens \u2014 the cost of the message JSON structure (<code>role</code>, <code>content</code>, delimiters).",
-    "diagram": "token_counting",
-    "highlight": [
-      "overhead",
-      "subtract"
-    ],
-    "hash": "0a2bd693"
-  },
   "66": {
-    "text": "This is the raw API call implementation that the LRU cache wraps. It's a separate method so the cache decorator can intercept calls before they reach the network.",
-    "diagram": "token_counting",
+    "text": "This is the raw API call method \u2014 the one that <code>lru_cache</code> wraps. It formats the input, calls Bedrock, and returns the raw token count (including message overhead). The cache key is <code>(text, model_id)</code>.",
+    "diagram": "architecture",
     "highlight": [
-      "format",
-      "api_call",
-      "raw"
+      "counter",
+      "bedrock"
     ],
     "hash": "5d850c4e"
   },
-  "71": {
-    "text": "Format the text into the Bedrock message structure before sending to the API. This is where the overhead comes from \u2014 the API counts tokens for the entire payload, not just the user's text.",
-    "diagram": "token_counting",
-    "highlight": [
-      "format"
-    ],
-    "hash": "a41bc273"
-  },
   "74": {
-    "text": "The CountTokens API call. <code>modelId</code> tells Bedrock which tokenizer to use (each Claude model may tokenize differently), and <code>input</code> contains the formatted message payload.",
+    "text": "The actual Bedrock API call. <code>count_tokens</code> is a relatively new Bedrock Runtime API operation. It accepts the same input format as <code>invoke_model</code> but returns only the token count without running inference \u2014 much cheaper and faster.",
     "important": true,
-    "diagram": "token_counting",
+    "diagram": "architecture",
     "highlight": [
-      "api_call"
+      "bedrock"
     ],
     "hash": "e19a98cd"
   },
-  "79": {
-    "text": "Extract the token count from the API response. The <code>.get()</code> with default 0 is defensive \u2014 if the response format changes, this returns 0 instead of crashing.",
-    "diagram": "token_counting",
-    "highlight": [
-      "raw"
-    ],
-    "hash": "f8881efc"
-  },
-  "81": {
-    "text": "A <code>@classmethod</code> so callers can check supported models without creating an instance (no AWS credentials needed). Returns a copy to prevent external code from modifying the class-level list.",
-    "diagram": "architecture",
-    "highlight": [
-      "counter"
-    ],
-    "hash": "c578a398"
-  },
-  "89": {
-    "text": "<code>.copy()</code> returns a new list so callers can't accidentally mutate <code>SUPPORTED_MODELS</code>. A subtle but important defensive pattern for class-level mutable state.",
-    "diagram": "architecture",
-    "highlight": [
-      "counter"
-    ],
-    "hash": "a4900eb3"
-  },
-  "91": {
-    "text": "This method handles the translation between user text and the Bedrock API's expected input format. It's the only place that knows about the Anthropic message schema.",
-    "diagram": "token_counting",
-    "highlight": [
-      "format"
-    ],
-    "hash": "2afd50f8"
-  },
   "103": {
-    "text": "The validation gate: unsupported models get a clear error listing all valid options. This fails fast at the application layer instead of sending a bad request to the API.",
+    "text": "Model validation happens here, not at the API boundary. This gives users a clear error message listing all supported models, rather than a cryptic Bedrock API error. The check uses a simple list membership test \u2014 fast enough since there are only ~12 models.",
     "diagram": "architecture",
     "highlight": [
-      "counter"
+      "counter",
+      "bedrock"
     ],
     "hash": "974bc2e3"
   },
-  "104": {
-    "text": "The Anthropic message format wraps user text in a specific JSON structure. This is the same format used for inference calls \u2014 the CountTokens API reuses the inference schema so token counts match exactly what you'd see in a real API call.",
-    "diagram": "token_counting",
-    "highlight": [
-      "format"
-    ],
-    "hash": "dde44124"
-  },
-  "105": {
-    "text": "The <code>invokeModel</code> wrapper tells the API to use the inference-compatible format. This ensures token counts match what you'd see in actual model invocations.",
-    "diagram": "token_counting",
-    "highlight": [
-      "format"
-    ],
-    "hash": "5cdaa502"
-  },
   "106": {
-    "text": "<code>json.dumps()</code> serializes the message body to a JSON string. The API expects a string, not a dict \u2014 this is a common gotcha when working with the Bedrock API.",
-    "diagram": "token_counting",
+    "text": "The input format mirrors what you'd send to <code>invoke_model</code>: an Anthropic messages-format body wrapped in <code>invokeModel</code>. The <code>max_tokens: 1</code> is required by the API schema but irrelevant for counting \u2014 no inference runs.",
+    "diagram": "architecture",
     "highlight": [
-      "format"
+      "bedrock"
     ],
     "hash": "b323d2cd"
   },
-  "107": {
-    "text": "<code>anthropic_version</code> pins the API contract. If Anthropic changes their message format in a future version, this ensures the token count stays consistent with the version your code was written for.",
-    "diagram": "token_counting",
+  "122": {
+    "text": "The public <code>count_tokens</code> method. It calls the cached implementation, then subtracts the message overhead so users see only the text's token count. Without this subtraction, <code>\"Hello\"</code> would report ~8 tokens instead of 1.",
+    "diagram": "architecture",
     "highlight": [
-      "format"
+      "counter",
+      "cache",
+      "bedrock"
     ],
-    "hash": "2460fd3f"
+    "hash": "633f2040"
   },
-  "109": {
-    "text": "The text is wrapped as a user message. This is why overhead subtraction is necessary \u2014 the API counts tokens for the entire message structure, not just the text content.",
-    "diagram": "token_counting",
-    "highlight": [
-      "format"
-    ],
-    "hash": "52b0867a"
-  },
-  "111": {
-    "text": "<code>max_tokens: 1</code> is required by the API schema but irrelevant for counting \u2014 we're not generating any output. Setting it to 1 minimizes the payload size.",
-    "diagram": "token_counting",
-    "highlight": [
-      "format"
-    ],
-    "hash": "a8d08adc"
-  },
-  "115": {
-    "text": "The error message includes the full list of supported models. This is more helpful than just saying \"unsupported\" \u2014 the user can immediately pick a valid model without consulting documentation.",
+  "139": {
+    "text": "<code>max(0, ...)</code> guards against edge cases where overhead subtraction could produce negative counts (e.g., empty strings). Defensive, but prevents confusing negative token counts.",
     "diagram": "architecture",
     "highlight": [
       "counter"
     ],
-    "hash": "675c27cf"
-  },
-  "122": {
-    "text": "The public <code>count_tokens()</code> method orchestrates the pipeline: cache lookup \u2192 raw count \u2192 overhead subtraction. The <code>max(0, ...)</code> guard prevents negative counts for edge cases like empty strings.",
-    "important": true,
-    "diagram": "token_counting",
-    "highlight": [
-      "subtract",
-      "result"
-    ],
-    "hash": "633f2040"
-  },
-  "137": {
-    "text": "First, get the raw count (which includes message overhead). This call goes through the LRU cache, so repeated counts for the same text are instant.",
-    "diagram": "token_counting",
-    "highlight": [
-      "cache",
-      "raw"
-    ],
-    "hash": "b048b7d5"
-  },
-  "138": {
-    "text": "Calculate the overhead for this model. Since <code>_get_message_overhead</code> also uses the LRU cache internally, this is typically a cache hit after the first call.",
-    "diagram": "token_counting",
-    "highlight": [
-      "overhead"
-    ],
-    "hash": "1c7e3c1c"
-  },
-  "139": {
-    "text": "Subtract overhead and clamp to zero. This gives users the intuitive count \u2014 just their text content, not the API wrapper.",
-    "diagram": "token_counting",
-    "highlight": [
-      "subtract",
-      "result"
-    ],
     "hash": "54e65d11"
   },
-  "141": {
-    "text": "The cache info method wraps Python's built-in <code>lru_cache</code> statistics in a more user-friendly dict format with a pre-computed hit rate.",
-    "diagram": "token_counting",
-    "highlight": [
-      "cache"
-    ],
-    "hash": "fc94f568"
-  },
   "148": {
-    "text": "Cache statistics expose hit/miss rates. This is valuable for tuning \u2014 if the hit rate is low during truncation, the cache size might need increasing.",
-    "diagram": "token_counting",
+    "text": "Exposes the underlying <code>lru_cache</code> statistics. The hit rate is the key metric: a high hit rate means the truncation algorithm is efficiently reusing previous counts rather than making redundant API calls.",
+    "diagram": "architecture",
     "highlight": [
       "cache"
     ],
     "hash": "b4181299"
   },
-  "154": {
-    "text": "The <code>hit_rate</code> calculation avoids division by zero for fresh counters that haven't made any calls yet.",
-    "hash": "90ce68d4"
-  },
   "157": {
-    "text": "The truncation algorithm is the most complex part of the library. It solves a hard problem: find the longest prefix of <code>text</code> that fits in <code>max_tokens</code>, using an API that only tells you the count for a given string (no inverse operation). The algorithm minimizes API calls through adaptive estimation.",
+    "text": "The truncation algorithm is the most complex part of the library. It finds the longest prefix of <code>text</code> that fits within <code>max_tokens</code>, using an adaptive approach that typically converges in 3-5 API calls. The <code>return_metadata</code> flag exposes internals for debugging.",
     "important": true,
     "diagram": "truncation",
     "highlight": [
-      "start"
+      "assess"
     ],
     "hash": "b970dfb3"
   },
   "181": {
-    "text": "Phase 1: count the full text to determine if truncation is needed at all. This single API call also establishes the baseline character-to-token ratio that drives the initial estimate.",
+    "text": "Phase 1 begins: count the full text to determine if truncation is needed at all. This uses the cached raw count (including overhead) because the truncation algorithm works with raw counts internally for consistency.",
     "diagram": "truncation",
     "highlight": [
-      "start",
-      "check"
+      "assess"
     ],
     "hash": "cd6ceda9"
   },
-  "182": {
-    "text": "Track API calls for the metadata return. This counter is incremented every time we call the CountTokens API, giving users visibility into the cost of truncation.",
-    "diagram": "truncation",
-    "highlight": [
-      "start"
-    ],
-    "hash": "61a0a8d5"
-  },
-  "183": {
-    "text": "Get the overhead once and reuse it. Since overhead is model-specific but text-independent, this single lookup serves the entire truncation operation.",
-    "diagram": "truncation",
-    "highlight": [
-      "check"
-    ],
-    "hash": "1c7e3c1c"
-  },
-  "184": {
-    "text": "Subtract overhead to get the true token count. The truncation algorithm needs accurate counts to decide whether truncation is needed.",
-    "diagram": "truncation",
-    "highlight": [
-      "check"
-    ],
-    "hash": "efd78190"
-  },
   "186": {
-    "text": "Early return \u2014 if the text already fits, return it unchanged. This is the common case for short inputs and avoids any further API calls.",
+    "text": "Early exit: if the text already fits, return it unchanged. This is the common case for short inputs and avoids all the estimation machinery. The overhead-adjusted count is used for the user-facing comparison.",
     "diagram": "truncation",
     "highlight": [
-      "check",
-      "no_trunc"
+      "assess"
     ],
     "hash": "2fba0092"
   },
-  "187": {
-    "text": "If <code>return_metadata</code> is requested, include the API call count even for the no-truncation case. This lets callers distinguish \"didn't need truncation\" (1 API call) from \"truncated\" (3+ calls).",
-    "diagram": "truncation",
-    "highlight": [
-      "no_trunc"
-    ],
-    "hash": "77dd4bcc"
-  },
-  "189": {
-    "text": "Return the original text unchanged. This is the fast path \u2014 one API call to confirm no truncation is needed.",
-    "diagram": "truncation",
-    "highlight": [
-      "no_trunc"
-    ],
-    "hash": "72dcfba3"
-  },
   "196": {
-    "text": "The character-to-token ratio is the key insight. For English text, it's roughly 4 characters per token, but it varies with vocabulary, punctuation, and language. Using the actual ratio from the full-text count gives a much better starting estimate than a fixed constant.",
-    "important": true,
+    "text": "The initial chars-per-token ratio is computed from the full text. This is the algorithm's starting estimate \u2014 it assumes the ratio is roughly uniform across the text. For English prose this is ~4 chars/token; for code it varies more.",
     "diagram": "truncation",
     "highlight": [
       "estimate"
@@ -440,316 +172,84 @@
     "hash": "a390c355"
   },
   "202": {
-    "text": "Text analysis: punctuation density, space ratio, and average word length are cheap to compute and improve the initial estimate. Highly punctuated text has more tokens per character (each punctuation mark is often its own token).",
+    "text": "Text analysis heuristics refine the initial estimate. Punctuation-heavy text has more tokens per character (each punctuation mark is often its own token). These adjustments are small (2-5%) but improve first-guess accuracy, saving an API call or two.",
     "diagram": "truncation",
     "highlight": [
       "estimate"
     ],
     "hash": "2c75af2a"
   },
-  "203": {
-    "text": "Space ratio measures word density. Text with many short words (high space ratio) tends to have more tokens per character because each word boundary often creates a new token.",
-    "diagram": "truncation",
-    "highlight": [
-      "estimate"
-    ],
-    "hash": "146ab7b0"
-  },
-  "204": {
-    "text": "Average word length is a proxy for vocabulary complexity. Technical text with long words (like \"electroencephalography\") gets split into multiple subword tokens, while common short words are often single tokens.",
-    "diagram": "truncation",
-    "highlight": [
-      "estimate"
-    ],
-    "hash": "2fe75c43"
-  },
-  "207": {
-    "text": "The adjustment factor nudges the ratio based on text characteristics. These are empirical corrections \u2014 not exact, but they reduce the number of API calls needed to converge. A 2-5% adjustment can save 1-2 API round-trips.",
-    "diagram": "truncation",
-    "highlight": [
-      "estimate"
-    ],
-    "hash": "bbb2989a"
-  },
-  "208": {
-    "text": "High punctuation (>5% of characters) means more tokens per character. Punctuation marks like commas and periods are typically their own tokens, so the same character count yields more tokens.",
-    "diagram": "truncation",
-    "highlight": [
-      "estimate"
-    ],
-    "hash": "68743973"
-  },
-  "210": {
-    "text": "High word density (>15% spaces) slightly reduces the chars-per-token ratio. More words in the same character count means more token boundaries.",
-    "diagram": "truncation",
-    "highlight": [
-      "estimate"
-    ],
-    "hash": "b3316e30"
-  },
-  "212": {
-    "text": "Long average words (>8 chars) slightly increase the ratio. Long words are split into subword tokens, but each subword covers more characters than a short word would.",
-    "diagram": "truncation",
-    "highlight": [
-      "estimate"
-    ],
-    "hash": "2e44ed03"
-  },
-  "216": {
-    "text": "Apply the adjustment to get a refined chars-per-token estimate. This is multiplied by <code>max_tokens</code> to get the initial target character position.",
-    "diagram": "truncation",
-    "highlight": [
-      "estimate"
-    ],
-    "hash": "355f5669"
-  },
   "217": {
-    "text": "The target character count is the algorithm's best guess at where to cut the text. It will be refined in the loop below as each API call provides a new data point.",
+    "text": "The target character count is the algorithm's first guess at where to cut the text. It multiplies the desired token count by the adjusted chars-per-token ratio. If the heuristics are good, this lands within a few tokens of the target.",
     "diagram": "truncation",
     "highlight": [
       "estimate"
     ],
     "hash": "bdc19839"
   },
-  "218": {
-    "text": "Clamp to text length \u2014 we can't test a substring longer than the original text.",
-    "diagram": "truncation",
-    "highlight": [
-      "estimate"
-    ],
-    "hash": "46a5dbbf"
-  },
-  "220": {
-    "text": "Track the best result found so far. The algorithm always keeps the longest text that fits within the token budget, even if it hasn't found an exact match yet.",
-    "diagram": "truncation",
-    "highlight": [
-      "loop_start"
-    ],
-    "hash": "51430453"
-  },
   "224": {
-    "text": "The adaptive learning loop. Each iteration: (1) test a substring, (2) compare to target, (3) update the estimate. The 20-call limit is a safety net \u2014 in practice, the algorithm converges in 3-5 calls for most texts.",
+    "text": "Phase 2: the adaptive convergence loop. Each iteration counts tokens for the current estimate, then adjusts. The 20-call limit prevents runaway loops \u2014 in practice, convergence happens in 3-5 iterations for most text.",
     "important": true,
     "diagram": "truncation",
     "highlight": [
-      "loop_start"
+      "converge"
     ],
     "hash": "09af6ac4"
   },
-  "226": {
-    "text": "Slice the text to the current target length. Python string slicing is O(n) but fast for the sizes involved (typically <100KB).",
-    "diagram": "truncation",
-    "highlight": [
-      "loop_start"
-    ],
-    "hash": "0e34e0a6"
-  },
-  "229": {
-    "text": "Count tokens for the current estimate. This call may hit the LRU cache if we've tested this exact substring before (common during fine-tuning near the boundary).",
-    "diagram": "truncation",
-    "highlight": [
-      "loop_start",
-      "count_api"
-    ],
-    "hash": "43b78981"
-  },
   "232": {
-    "text": "Perfect match \u2014 the estimated substring has exactly the right number of tokens. This happens more often than you'd expect because the ratio-based estimation is quite accurate after the first refinement.",
+    "text": "Three outcomes per iteration: exact match (done), under target (expand), or over target (shrink). The algorithm uses the chars-per-token ratio to estimate how much to adjust, getting more accurate with each measurement.",
     "diagram": "truncation",
     "highlight": [
-      "exact",
-      "done"
+      "converge"
     ],
     "hash": "0933ae90"
   },
-  "234": {
-    "text": "Save the perfect match and break out of the loop. No further API calls needed.",
-    "diagram": "truncation",
-    "highlight": [
-      "exact",
-      "done"
-    ],
-    "hash": "1c61424b"
-  },
-  "237": {
-    "text": "Under target \u2014 we can fit more text. The algorithm calculates how many more characters to add based on the current ratio, then checks if we're close enough for character-by-character fine-tuning.",
-    "diagram": "truncation",
-    "highlight": [
-      "under",
-      "add_chars"
-    ],
-    "hash": "1b14d403"
-  },
-  "243": {
-    "text": "Calculate the token gap. This drives the decision between ratio-based jumping (large gap) and character-by-character scanning (small gap).",
-    "diagram": "truncation",
-    "highlight": [
-      "under",
-      "add_chars"
-    ],
-    "hash": "ba9eff77"
-  },
-  "246": {
-    "text": "Use the current ratio to estimate how many characters correspond to the remaining tokens. This estimate improves with each iteration as the ratio is recalculated from actual measurements.",
-    "diagram": "truncation",
-    "highlight": [
-      "add_chars"
-    ],
-    "hash": "e533e61e"
-  },
   "250": {
-    "text": "When the remaining gap is small (\u22645 tokens worth of characters), switch from ratio-based jumps to character-by-character scanning. This avoids overshooting the boundary, which would waste an API call.",
+    "text": "Phase 3: fine-tuning. When the estimated adjustment is \u22645 characters, the algorithm switches from ratio-based jumps to character-by-character scanning. This finds the exact token boundary at the cost of a few more API calls.",
     "diagram": "truncation",
     "highlight": [
-      "close",
-      "fine_tune"
+      "finetune"
     ],
     "hash": "4e8ecf7c"
   },
-  "251": {
-    "text": "Scan up to 15 characters ahead from the current best position. This range is generous enough to cross token boundaries (most tokens are 1-4 characters) while keeping API calls bounded.",
-    "diagram": "truncation",
-    "highlight": [
-      "fine_tune"
-    ],
-    "hash": "ebaaa229"
-  },
-  "257": {
-    "text": "Keep extending as long as we're under the token budget. Each character added might or might not cross a token boundary \u2014 we keep the longest text that still fits.",
-    "diagram": "truncation",
-    "highlight": [
-      "fine_tune"
-    ],
-    "hash": "8271eefc"
-  },
-  "261": {
-    "text": "If we hit the exact target during fine-tuning, stop immediately. This is the ideal outcome \u2014 exact match with minimal API calls.",
-    "diagram": "truncation",
-    "highlight": [
-      "fine_tune",
-      "done"
-    ],
-    "hash": "0933ae90"
-  },
   "268": {
-    "text": "Over target \u2014 too many tokens. Mirror of the under-target logic: calculate characters to remove, check if we're close enough for fine-tuning.",
+    "text": "The over-target branch mirrors the under-target logic: estimate how many characters to remove, then switch to character-by-character if close. The asymmetry is that removal scans backward from the current position.",
     "diagram": "truncation",
     "highlight": [
-      "remove_chars"
+      "converge"
     ],
     "hash": "675c27cf"
   },
-  "271": {
-    "text": "Calculate excess tokens and convert to characters to remove. The mirror of the under-target logic \u2014 same ratio-based estimation, opposite direction.",
-    "diagram": "truncation",
-    "highlight": [
-      "remove_chars"
-    ],
-    "hash": "af68dc35"
-  },
-  "273": {
-    "text": "<code>max(..., 1)</code> prevents the target from reaching zero. Even if the estimate says to remove all characters, we keep at least 1 to avoid an empty-string edge case.",
-    "diagram": "truncation",
-    "highlight": [
-      "remove_chars"
-    ],
-    "hash": "6b973aae"
-  },
-  "276": {
-    "text": "Same fine-tuning threshold as the under-target path. When close to the boundary, character-by-character removal is more precise than ratio-based jumps.",
-    "diagram": "truncation",
-    "highlight": [
-      "close",
-      "fine_tune"
-    ],
-    "hash": "27199d37"
-  },
   "295": {
-    "text": "If the API itself errors (throttling, transient failure), reduce the target by 10 characters and retry. This graceful degradation keeps the algorithm running instead of crashing.",
+    "text": "API errors during the loop trigger a fallback: reduce the target by 10 characters and retry. This handles transient Bedrock throttling without aborting the entire truncation.",
     "diagram": "truncation",
     "highlight": [
-      "loop_start"
+      "converge"
     ],
     "hash": "34c7ea9a"
   },
   "301": {
-    "text": "Final verification: confirm the result is correct. If the adaptive loop didn't find an exact match (rare), fall back to an exhaustive search within the API call budget.",
+    "text": "Final verification: re-count the best result to confirm accuracy. If it's not exact and we have API budget remaining, fall back to an exhaustive linear scan. This guarantees correctness at the cost of more calls for edge cases.",
     "diagram": "truncation",
     "highlight": [
-      "done"
+      "finetune"
     ],
     "hash": "6b82fe24"
   },
-  "302": {
-    "text": "Verify the best result by counting its tokens one more time. This catches any inconsistencies from the adaptive loop (e.g., if the cache was evicted mid-loop).",
-    "diagram": "truncation",
-    "highlight": [
-      "done"
-    ],
-    "hash": "b9273502"
-  },
   "306": {
-    "text": "The exhaustive fallback: try every possible length starting from 1. This guarantees correctness at the cost of potentially more API calls. In practice, the adaptive loop almost always finds the answer first.",
+    "text": "The exhaustive fallback scans from the beginning of the text, checking every prefix length. This is expensive (O(n) API calls) but only triggers when the adaptive algorithm fails to converge \u2014 typically for text with highly irregular tokenization patterns.",
     "diagram": "truncation",
     "highlight": [
-      "done"
+      "finetune"
     ],
     "hash": "3848dd32"
   },
-  "309": {
-    "text": "Respect the 20-call budget even in the exhaustive fallback. This prevents runaway API costs if the text is very long and the adaptive loop failed to converge.",
-    "diagram": "truncation",
-    "highlight": [
-      "done"
-    ],
-    "hash": "1124426c"
-  },
-  "316": {
-    "text": "Exact match found during exhaustive search. Break immediately \u2014 no need to test longer strings.",
-    "diagram": "truncation",
-    "highlight": [
-      "done"
-    ],
-    "hash": "a8f23962"
-  },
-  "321": {
-    "text": "Track the best under-target result during exhaustive search. Even if we don't find an exact match, we return the longest text that fits.",
-    "diagram": "truncation",
-    "highlight": [
-      "done"
-    ],
-    "hash": "0d3e7aa9"
-  },
-  "327": {
-    "text": "Edge case: if no valid text was found (extremely rare \u2014 would require the first character to exceed max_tokens), return empty with zero count.",
-    "diagram": "truncation",
-    "highlight": [
-      "done"
-    ],
-    "hash": "675c27cf"
-  },
   "330": {
-    "text": "The <code>return_metadata</code> flag is an advanced feature for debugging and performance tuning. It exposes the number of API calls used, which helps users understand the cost of truncation operations.",
+    "text": "The <code>return_metadata</code> path exposes <code>api_calls</code> and <code>final_token_count</code> for debugging and performance monitoring. The CLI could use this with a <code>--verbose</code> flag to show how efficient the truncation was.",
     "diagram": "truncation",
     "highlight": [
-      "done"
+      "assess"
     ],
     "hash": "77dd4bcc"
-  },
-  "332": {
-    "text": "The default return \u2014 just the truncated text string. Most callers don't need the metadata; they just want the result.",
-    "diagram": "truncation",
-    "highlight": [
-      "done"
-    ],
-    "hash": "2f84f5e7"
-  },
-  "24": {
-    "text": "Claude Opus 4 is the most capable (and expensive) model in the list. Users who need the highest accuracy for token counting can specify this model explicitly.",
-    "diagram": "architecture",
-    "highlight": [
-      "counter"
-    ],
-    "hash": "9f126b38"
   }
 }

@@ -1,65 +1,28 @@
 {
   "title": "ttok4bedrock",
-  "tagline": "Token counting for Amazon Bedrock — a ttok-compatible drop-in replacement",
+  "tagline": "Token counting for Amazon Bedrock — a ttok-compatible CLI and SDK",
   "repo_url": "https://github.com/danilop/ttok4bedrock",
-  "language": "python",
   "code_dir": "../ttok4bedrock",
-  "chapters": [
-    {
-      "id": "interface",
-      "title": "Interface Layer",
-      "description": "How users interact with ttok4bedrock — through the Python SDK or the command-line interface. Both are thin wrappers that delegate all real work to the core engine.",
-      "diagram": "graph LR\n  user([User]) --> sdk[\"SDK<br/>count_tokens / truncate\"]\n  user --> cli[\"CLI<br/>ttok4bedrock command\"]\n  sdk --> engine[\"BedrockTokenCounter\"]\n  cli --> engine\n  engine --> api[\"Bedrock CountTokens API\"]",
-      "labs": ["sdk_api", "cli_entry"]
-    },
-    {
-      "id": "engine",
-      "title": "Core Engine",
-      "description": "The BedrockTokenCounter class — LRU caching, message overhead removal, API integration, and an adaptive truncation algorithm that converges in 3-5 API calls.",
-      "diagram": "graph TD\n  input[\"Input Text\"] --> cache{\"LRU Cache\"}\n  cache -->|hit| result[\"Token Count\"]\n  cache -->|miss| format[\"Format as Bedrock Message\"]\n  format --> api[\"CountTokens API\"]\n  api --> overhead[\"Subtract Overhead\"]\n  overhead --> result",
-      "labs": ["core_engine"],
-      "knowledge_checks": [
-        {
-          "question": "Why does ttok4bedrock subtract a 'message overhead' from the raw API token count?",
-          "options": [
-            "To account for network latency",
-            "Because the Bedrock API wraps text in a message structure that adds extra tokens",
-            "To round down to the nearest integer",
-            "To compensate for model-specific tokenizer differences"
-          ],
-          "correct": 1,
-          "explanation": "The CountTokens API counts tokens for the entire message payload including the JSON structure (role, content fields). Subtracting the overhead gives users the intuitive count for just their text content."
-        },
-        {
-          "question": "What is the main benefit of the LRU cache in the truncation algorithm?",
-          "options": [
-            "It makes the code shorter",
-            "It avoids repeated API calls for the same text, which is critical when the truncation loop tests overlapping substrings",
-            "It stores AWS credentials",
-            "It limits memory usage"
-          ],
-          "correct": 1,
-          "explanation": "The adaptive truncation algorithm may test many substrings that share prefixes. The LRU cache ensures that if the same substring is counted twice, the second call is instant instead of a ~200ms API round-trip."
-        }
-      ]
-    }
-  ],
-  "labs": [
+  "terminology": {
+    "group": "Part",
+    "unit": "Step"
+  },
+  "units": [
     {
       "id": "sdk_api",
       "file": "__init__.py",
-      "title": "Public SDK",
-      "tagline": "The two-function API that makes ttok4bedrock a drop-in replacement for ttok",
-      "description": "This module is the public face of the library. It exposes just two functions — <code>count_tokens()</code> and <code>truncate()</code> — that mirror the original ttok interface. Each function creates a fresh <code>BedrockTokenCounter</code> and delegates immediately, keeping the API surface minimal.",
+      "title": "SDK Public Interface",
+      "tagline": "The two functions users import — count_tokens and truncate",
+      "description": "This module is the public API surface. It exposes two functions that mirror the original <code>ttok</code> library interface, making <code>ttok4bedrock</code> a drop-in replacement. Each function creates a <code>BedrockTokenCounter</code> internally, so SDK users never need to manage the counter lifecycle.",
       "learning_objectives": [
-        "Understand the facade pattern: a simple public API hiding complex internals",
-        "See how lazy imports keep module loading fast",
-        "Recognize the design decision to create a new counter per call vs. reusing one"
+        "Understand the public API contract and how it maps to ttok compatibility",
+        "See how the SDK delegates to BedrockTokenCounter while hiding complexity",
+        "Learn why each call creates a fresh counter instance (and the trade-off involved)"
       ],
       "exercises": [
         {
-          "prompt": "The SDK creates a new BedrockTokenCounter on every call, which means the LRU cache is never reused across calls. Modify count_tokens() to use a module-level counter instance and observe the cache hit rate difference.",
-          "hint": "Create a _default_counter at module level (or use a factory with a cache). Check counter.get_cache_info() before and after repeated calls."
+          "prompt": "Add a third public function get_supported_models() that returns the list of supported model IDs without requiring AWS credentials.",
+          "hint": "You can call BedrockTokenCounter.get_supported_models() — it's a classmethod that doesn't need an instance."
         }
       ]
     },
@@ -67,40 +30,35 @@
       "id": "cli_entry",
       "file": "cli.py",
       "title": "CLI Entry Point",
-      "tagline": "A Click-based command that provides ttok-compatible token counting from the terminal",
-      "description": "The CLI accepts text from arguments, files, or stdin — just like the original ttok. It adds Bedrock-specific options (<code>--aws-region</code>, <code>-m</code> for model ID) and translates AWS exceptions into user-friendly error messages.",
+      "tagline": "Click-based command-line interface with ttok-compatible flags",
+      "description": "The CLI provides the same flags as <code>ttok</code> (<code>-t</code>, <code>-m</code>, <code>-i</code>) so users can swap <code>ttok</code> for <code>ttok4bedrock</code> without changing scripts. It reads from arguments or stdin, delegates to <code>BedrockTokenCounter</code>, and translates AWS exceptions into user-friendly messages.",
       "learning_objectives": [
-        "Understand how Click decorators compose a CLI interface declaratively",
-        "See the input priority logic: arguments > file > stdin",
-        "Learn the error handling strategy: catch specific AWS exceptions and translate them"
+        "See how Click decorators define a ttok-compatible CLI interface",
+        "Understand the input assembly logic (args vs stdin vs file)",
+        "Learn the error handling strategy for AWS credential and API failures"
       ],
       "exercises": [
         {
-          "prompt": "Add a --verbose flag that prints the model ID and region being used before counting. How does Click's decorator pattern make this easy to add?",
-          "hint": "Add @click.option('--verbose', is_flag=True) and use it in the function body before the counter call."
+          "prompt": "Add a --verbose flag that prints the number of API calls used during truncation. You'll need to pass return_metadata=True to counter.truncate().",
+          "hint": "The metadata dict returned by truncate() includes 'api_calls' and 'final_token_count'."
         }
       ]
     },
     {
       "id": "core_engine",
       "file": "bedrock_counter.py",
-      "title": "Core Engine",
-      "tagline": "BedrockTokenCounter — caching, overhead removal, API integration, and adaptive truncation",
-      "description": "This is where the real work happens. The <code>BedrockTokenCounter</code> class wraps the Bedrock CountTokens API with three key innovations: (1) LRU caching to minimize API calls, (2) automatic message overhead subtraction for intuitive token counts, and (3) an adaptive truncation algorithm that converges in 3-5 API calls by learning the character-to-token ratio from each measurement.",
+      "title": "Core Token Counting Engine",
+      "tagline": "BedrockTokenCounter — API calls, LRU caching, and adaptive truncation",
+      "description": "This is the heart of the library. <code>BedrockTokenCounter</code> wraps the Bedrock <code>CountTokens</code> API with LRU caching, automatic overhead removal, and an adaptive truncation algorithm that minimizes API calls while finding the exact token boundary.",
       "learning_objectives": [
-        "Understand how functools.lru_cache is applied to an instance method via a wrapper pattern",
-        "Learn why message overhead subtraction is necessary and how it's computed",
-        "Trace the adaptive truncation algorithm: initial estimation → ratio refinement → fine-tuning",
-        "See how text characteristics (punctuation, word length) improve the initial estimate"
+        "Understand how LRU caching wraps the Bedrock API to avoid redundant calls",
+        "Learn the overhead removal technique that subtracts message structure tokens",
+        "Follow the adaptive truncation algorithm through its three phases: estimation, convergence, and fine-tuning"
       ],
       "exercises": [
         {
-          "prompt": "The truncation algorithm uses a self-imposed limit of 20 API calls. Try truncating a very long text (10,000+ characters) to 5 tokens with return_metadata=True. How many API calls does it actually use? What happens if you lower the limit to 5?",
-          "hint": "Use counter.truncate(long_text, 5, model_id, return_metadata=True) and inspect the api_calls field in the metadata dict."
-        },
-        {
-          "prompt": "The smart estimation adjusts chars_per_token based on punctuation density, space ratio, and average word length. Create two test strings — one with many short words and punctuation, one with long technical terms — and compare how many API calls the truncation needs for each.",
-          "hint": "Try 'Hi! Yes. No. OK? Wow!' vs 'electroencephalography neuropsychopharmacology' and use return_metadata=True."
+          "prompt": "The truncation algorithm uses a fixed limit of 20 API calls. What happens if you lower it to 5? Try with a 10,000-word text truncated to 100 tokens and observe accuracy.",
+          "hint": "With fewer iterations the algorithm may not converge to the exact boundary — you'll get a result that's close but not exact."
         }
       ]
     }

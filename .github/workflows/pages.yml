@@ -22,26 +22,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-
-      - name: Install walk-the-code
-        run: pip install walk-the-code
-
-      - name: Create symlinks for builder
-        run: cd ttok4bedrock && ln -s . sdk_api && ln -s . cli_entry && ln -s . core_engine
-
-      - name: Build walkthrough data
-        run: cd walk-the-code && wtc-build config.json
-
-      - name: Assemble static site
+      - name: Build walkthrough
         run: |
-          mkdir _site
-          ASSETS=$(python -c "import walk_the_code; print(walk_the_code.ASSETS_DIR)")
-          cp "$ASSETS"/*.html "$ASSETS"/*.js "$ASSETS"/*.css "$ASSETS"/*.svg _site/
-          cp -r walk-the-code/data _site/data
+          uv tool install "walk-the-code @ git+https://github.com/danilop/walk-the-code"
+          wtc-build walk-the-code/config.json
+          WTC_PYTHON="$(uv tool dir)/walk-the-code/bin/python"
+          WTC_ASSETS=$("$WTC_PYTHON" -c "from walk_the_code import ASSETS_DIR; print(ASSETS_DIR)")
+          mkdir -p _site/data
+          for f in index.html unit.html group.html embed.html favicon.svg style.css site.js \
+                   unit.js unit-state.js unit-data.js unit-render.js unit-edit.js unit-search.js \
+                   unit-tour.js terminal.js group.js embed.js; do
+            [ -f "$WTC_ASSETS/$f" ] && cp "$WTC_ASSETS/$f" _site/
+          done
+          cp walk-the-code/data/units.json _site/data/
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
